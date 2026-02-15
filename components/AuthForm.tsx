@@ -8,6 +8,8 @@ import { auth } from "@/firebase/client";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 
 import {
   createUserWithEmailAndPassword,
@@ -40,6 +42,18 @@ const AuthForm = ({ type }: { type: FormType }) => {
       password: "",
     },
   });
+
+  // Auto-redirect if user is already logged in
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is already logged in, redirect to home
+        router.push("/");
+      }
+    });
+
+    return () => unsub();
+  }, [router]);
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
@@ -87,7 +101,13 @@ const AuthForm = ({ type }: { type: FormType }) => {
         });
 
         toast.success("Signed in successfully.");
+        
+        // Force redirect after successful login
         router.push("/");
+        // Fallback redirect in case router.push doesn't work
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 100);
       }
     } catch (error) {
       console.log(error);
