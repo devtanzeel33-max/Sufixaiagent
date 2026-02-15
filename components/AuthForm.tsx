@@ -8,7 +8,7 @@ import { auth } from "@/firebase/client";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 
 import {
@@ -32,6 +32,7 @@ const authFormSchema = (type: FormType) => {
 
 const AuthForm = ({ type }: { type: FormType }) => {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   const formSchema = authFormSchema(type);
   const form = useForm<z.infer<typeof formSchema>>({
@@ -43,16 +44,34 @@ const AuthForm = ({ type }: { type: FormType }) => {
     },
   });
 
-  // Auto-redirect if user is already logged in
+  // Check auth state and redirect if already logged in (with error handling)
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        // User is already logged in, redirect to home
-        router.push("/");
-      }
-    });
+    try {
+      const unsub = onAuthStateChanged(
+        auth,
+        (user) => {
+          if (user) {
+            // User is already logged in, redirect to home
+            router.replace("/");
+          } else {
+            // User is not logged in, show login form
+            setLoading(false);
+          }
+        },
+        (error) => {
+          // Firebase auth error - likely missing/invalid API key
+          console.error("Firebase auth error:", error);
+          // Still show login form even on error
+          setLoading(false);
+        }
+      );
 
-    return () => unsub();
+      return () => unsub();
+    } catch (error) {
+      // Firebase not initialized properly
+      console.error("Firebase initialization error:", error);
+      setLoading(false);
+    }
   }, [router]);
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
@@ -116,6 +135,18 @@ const AuthForm = ({ type }: { type: FormType }) => {
   };
 
   const isSignIn = type === "sign-in";
+
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-100"></div>
+          <p className="text-primary-100">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card-border lg:min-w-[566px]">
